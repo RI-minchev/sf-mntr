@@ -133,7 +133,7 @@ def get_logs_events(ctx: snowflake.connector.SnowflakeConnection, date_from: dat
                 from admin.utils.event_logging where
                     record_type ilike any ('log', 'event') and
                     record['severity_text'] ilike any ('warn','error','fatal') and
-                    timestamp > '{date_from.isoformat()}' 
+                    --timestamp > DATEADD(MINUTE, -5, CURRENT_TIMESTAMP()) 
                     order by event_timestamp asc""")
         for row in cs:
             row = parse_logs_event(row)
@@ -141,6 +141,7 @@ def get_logs_events(ctx: snowflake.connector.SnowflakeConnection, date_from: dat
     finally:
         cs.close()     
 
+#sending logs to Azure Sentinel
 
 def parse_logs_event(event: dict) -> dict:
     if 'EVENT_TIMESTAMP' in event and isinstance(event['EVENT_TIMESTAMP'], datetime.datetime):
@@ -148,6 +149,11 @@ def parse_logs_event(event: dict) -> dict:
     event['source_table'] = 'EVENT_LOGGING'
     return event
 
+# truncate latest events from the table 
+
+
+# Check if the script is running too long
+# If the script runs longer than 85% of the maximum execution time, it will stop
 
 def check_if_script_runs_too_long(script_start_time: int) -> bool:
         now = int(time.time())
