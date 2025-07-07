@@ -114,14 +114,16 @@ def parse_date_from(date_from: str) -> datetime.datetime:
     except:
         pass
     if not isinstance(date_from, datetime.datetime):
-        date_from = datetime.datetime.utcnow().replace(tzinfo=datetime.timezone.utc) - datetime.timedelta(minutes=15)
+        date_from = datetime.datetime.utcnow().replace(tzinfo=datetime.timezone.utc) - datetime.timedelta(minutes=5)
     return date_from
 
+# the below inserts from the stream to the table with the latest logs and that cleans the stream, as well.
 
-def get_logs_events(ctx: snowflake.connector.SnowflakeConnection, date_from: datetime.datetime) -> Iterable[dict]:
+def move_stream_to_latest(ctx: snowflake.connector.SnowflakeConnection, date_from: datetime.datetime) -> Iterable[dict]:
     cs = ctx.cursor(DictCursor)
     try:
-        cs.execute(f"""select
+        cs.execute(f"""insert into ADMIN.UTILS.LATEST_EVENT_LOGS 
+                    select
                     current_account() as account_name,
                     timestamp as EVENT_TIMESTAMP,
                     trim(resource_attributes['snow.database.name'],'"') as database_name,
@@ -130,10 +132,17 @@ def get_logs_events(ctx: snowflake.connector.SnowflakeConnection, date_from: dat
                     trim(resource_attributes['snow.executable.name'],'"') as source_object,
                     trim(value,'"') as message,
                     trim(resource_attributes['snow.query.id'],'"') as query_id  
-                from admin.utils.event_logging where
+                from ADMIN.UTILS.EVENT_LOGGING_STREAM where
                     record_type ilike any ('log', 'event') and
-                    record['severity_text'] ilike any ('warn','error','fatal') and
-                    --timestamp > DATEADD(MINUTE, -5, CURRENT_TIMESTAMP()) 
+                    record['severity_text'] ilike any ('warn','error','fatal','info') 
+                    order by event_timestamp asc""")
+    finally:
+        cs.close() 
+
+def get_logs_events(ctx: snowflake.connector.SnowflakeConnection, date_from: datetime.datetime) -> Iterable[dict]:
+    cs = ctx.cursor(DictCursor)
+    try:
+        cs.execute(f"""select * from ADMIN.UTILS.LATEST_EVENT_LOGS 
                     order by event_timestamp asc""")
         for row in cs:
             row = parse_logs_event(row)
@@ -141,7 +150,7 @@ def get_logs_events(ctx: snowflake.connector.SnowflakeConnection, date_from: dat
     finally:
         cs.close()     
 
-#sending logs to Azure Sentinel
+# sending logs to Log Analytics through Azure Sentinel
 
 def parse_logs_event(event: dict) -> dict:
     if 'EVENT_TIMESTAMP' in event and isinstance(event['EVENT_TIMESTAMP'], datetime.datetime):
@@ -151,6 +160,12 @@ def parse_logs_event(event: dict) -> dict:
 
 # truncate latest events from the table 
 
+def truncate_latest_events(ctx: snowflake.connector.SnowflakeConnection) -> None:
+    cs = ctx.cursor(DictCursor)
+    try:
+        cs.execute(f"""truncate table ADMIN.UTILS.LATEST_EVENT_LOGS""")
+    finally:
+        cs.close()   
 
 # Check if the script is running too long
 # If the script runs longer than 85% of the maximum execution time, it will stop
@@ -158,5 +173,5 @@ def parse_logs_event(event: dict) -> dict:
 def check_if_script_runs_too_long(script_start_time: int) -> bool:
         now = int(time.time())
         duration = now - script_start_time
-        max_duration = int(MAX_SCRIPT_EXEC_TIME_MINUTES * 60 * 0.85)
+        max_duration = int(MAX_SCRIPT_EXEC_TIME_MINUTES * 5 * 0.85)
         return duration > max_duration

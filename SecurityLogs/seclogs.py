@@ -155,7 +155,7 @@ def parse_date_from(date_from: str) -> datetime.datetime:
     except:
         pass
     if not isinstance(date_from, datetime.datetime):
-        date_from = datetime.datetime.utcnow().replace(tzinfo=datetime.timezone.utc) - datetime.timedelta(minutes=15)
+        date_from = datetime.datetime.utcnow().replace(tzinfo=datetime.timezone.utc) - datetime.timedelta(minutes=5)
     return date_from
 
 
