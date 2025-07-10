@@ -88,8 +88,8 @@ def main(mytimer: func.TimerRequest):
     logs_date_from = parse_date_from(logs_date_from)
     logging.info(f'Getting LOGS events from {logs_date_from}')
     last_ts = None
-    move_stream_to_latest(ctx, logs_date_from)  # Move events from the stream to the latest events table
-    for event in get_logs_events(ctx, logs_date_from):
+    move_stream_to_latest(ctx)  # Move events from the stream to the latest events table
+    for event in get_logs_events(ctx):
         sentinel.send(event)
         last_ts = event.get('timestamp')
         if last_ts:
@@ -120,7 +120,7 @@ def parse_date_from(date_from: str) -> datetime.datetime:
 
 # the below inserts from the stream to the table with the latest logs and that cleans the stream, as well.
 
-def move_stream_to_latest(ctx: snowflake.connector.SnowflakeConnection, date_from: datetime.datetime) -> Iterable[dict]:
+def move_stream_to_latest(ctx: snowflake.connector.SnowflakeConnection) -> None:
     cs = ctx.cursor(DictCursor)
     try:
         cs.execute(f"""insert into ADMIN.UTILS.LATEST_EVENT_LOGS 
