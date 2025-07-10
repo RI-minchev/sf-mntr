@@ -1,5 +1,4 @@
-from azure.storage.fileshare import ShareClient
-from azure.storage.fileshare import ShareFileClient
+from azure.storage.fileshare import ShareClient, ShareFileClient
 from azure.core.exceptions import ResourceNotFoundError
 import logging
 
